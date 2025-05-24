@@ -9,9 +9,10 @@ declare_id!("9taCctXUoxDPeqK4eLX3U7d4K953kM6QLJucPcoZUeRZ");
 pub mod up_only {
     use super::*;
 
-    const TEAM_FEE_BPS: u64 = 200; // 2%
+    const TEAM_FEE_BPS: u64 = 300; // 3%
     const FOUNDER_FEE_BPS: u64 = 50; // 0.5%
-    const LOCKED_LIQUIDITY_BPS: u64 = 750; // 7.5%
+    const BUY_FEE_BPS: u64 = 1000; // 10%
+    const SELL_FEE_BPS: u64 = 1500; // 15%
 
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         if ctx.accounts.metadata.initialized {
@@ -185,7 +186,7 @@ pub mod up_only {
         let referral_share = price * TEAM_FEE_BPS / 10_000 / 2;
         let total_usdc = amount;
         let team_share = total_usdc * TEAM_FEE_BPS / 10_000;
-        let locked_share = total_usdc * LOCKED_LIQUIDITY_BPS / 10_000;
+        let locked_share = total_usdc * BUY_FEE_BPS / 10_000;
         let founder_fee = total_usdc * FOUNDER_FEE_BPS / 10_000;
         let usdc_for_tokens = total_usdc - team_share - locked_share - founder_fee;
 
@@ -318,7 +319,7 @@ pub mod up_only {
         let total_value = tokens_to_sell * price_per_token;
         let total_value_scaled = total_value * 1e6;
         let locked_share =
-            ((LOCKED_LIQUIDITY_BPS as f64 / 10_000.0) * total_value_scaled).round() as u64;
+            ((SELL_FEE_BPS as f64 / 10_000.0) * total_value_scaled).round() as u64;
         let team_cut_u64 = ((TEAM_FEE_BPS as f64 / 10_000.0) * total_value_scaled).round() as u64;
         let founders_cut_u64 =
             ((FOUNDER_FEE_BPS as f64 / 10_000.0) * total_value_scaled).round() as u64;
@@ -465,7 +466,7 @@ pub mod up_only {
         let total_usdc = amount;
         let team_share = total_usdc * config.team_bps / 10_000;
         let founder_fee = total_usdc * config.founder_bps / 10_000;
-        let locked_share = total_usdc * config.liquidity_bps / 10_000;
+        let locked_share = total_usdc * config.buy_bps / 10_000;
         let usdc_for_tokens = total_usdc - team_share - founder_fee - locked_share;
 
         let liquidity_balance =
@@ -608,7 +609,7 @@ pub mod up_only {
             ((config.founder_bps as f64 / 10_000.0) * total_value_scaled).round() as u64;
         let team_fee = ((config.team_bps as f64 / 10_000.0) * total_value_scaled).round() as u64;
         let liquidity_fee =
-            ((config.liquidity_bps as f64 / 10_000.0) * total_value_scaled).round() as u64;
+            ((config.sell_bps as f64 / 10_000.0) * total_value_scaled).round() as u64;
         let user_receives =
             total_value_scaled.round() as u64 - founder_fee - team_fee - liquidity_fee;
         let vault_bump = ctx.bumps.vault_authority;
@@ -707,7 +708,7 @@ pub mod up_only {
             ((config.founder_bps as f64 / 10_000.0) * total_value_scaled).round() as u64;
         let team_fee = ((config.team_bps as f64 / 10_000.0) * total_value_scaled).round() as u64;
         let liquidity_fee =
-            ((config.liquidity_bps as f64 / 10_000.0) * total_value_scaled).round() as u64;
+            ((config.sell_bps as f64 / 10_000.0) * total_value_scaled).round() as u64;
         let user_receives =
             total_value_scaled.round() as u64 - founder_fee - team_fee - liquidity_fee;
 
@@ -841,39 +842,46 @@ pub mod up_only {
 pub fn get_lock_fee_config(lock_days: u64) -> LockFeeConfig {
     match lock_days {
         0..=3 => LockFeeConfig {
-            liquidity_bps: 400,
-            team_bps: 100,
-            founder_bps: 25,
+            buy_bps: 250,
+            sell_bps: 250,
+            team_bps: 150,
+            founder_bps: 50,
         },
         4..=7 => LockFeeConfig {
-            liquidity_bps: 500,
-            team_bps: 150,
-            founder_bps: 25,
+            buy_bps: 300,
+            sell_bps: 400,
+            team_bps: 200,
+            founder_bps: 50,
         },
         8..=14 => LockFeeConfig {
-            liquidity_bps: 600,
-            team_bps: 200,
-            founder_bps: 25,
+            buy_bps: 400,
+            sell_bps: 500,
+            team_bps: 250,
+            founder_bps: 50,
         },
         15..=31 => LockFeeConfig {
-            liquidity_bps: 1000,
-            team_bps: 250,
-            founder_bps: 25,
+            buy_bps: 500,
+            sell_bps: 600,
+            team_bps: 300,
+            founder_bps: 50,
         },
         32..=60 => LockFeeConfig {
-            liquidity_bps: 1000,
-            team_bps: 300,
-            founder_bps: 25,
+            buy_bps: 600,
+            sell_bps: 700,
+            team_bps: 350,
+            founder_bps: 50,
         },
         61..=90 => LockFeeConfig {
-            liquidity_bps: 1500,
-            team_bps: 400,
-            founder_bps: 25,
+            buy_bps: 900,
+            sell_bps: 1000,
+            team_bps: 500,
+            founder_bps: 50,
         },
         _ => LockFeeConfig {
-            liquidity_bps: 2000,
+            buy_bps: 900,
+            sell_bps: 1000,
             team_bps: 500,
-            founder_bps: 25,
+            founder_bps: 50,
         },
     }
 }
@@ -1390,7 +1398,8 @@ pub struct FoundersPool {
 
 #[account]
 pub struct LockFeeConfig {
-    pub liquidity_bps: u64,
+    pub buy_bps: u64,
+    pub sell_bps: u64,
     pub team_bps: u64,
     pub founder_bps: u64,
 }
